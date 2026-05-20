@@ -1,0 +1,25 @@
+---
+- name: Set ufw default input policy
+  community.general.ufw:
+    direction: incoming
+    default: "{{ ufw_default_input_policy }}"
+
+- name: Set ufw default output policy
+  community.general.ufw:
+    direction: outgoing
+    default: "{{ ufw_default_output_policy }}"
+
+- name: Allow configured ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    comment: "{{ item.comment | default('') }}"
+  loop: "{{ ufw_allowed_ports }}"
+  loop_control:
+    label: "{{ item.port }}/{{ item.proto | default('tcp') }}"
+
+- name: Enable ufw + log low
+  community.general.ufw:
+    state: enabled
+    logging: low

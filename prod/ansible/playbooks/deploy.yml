@@ -1,0 +1,15 @@
+---
+- name: Lumiris prod — deploy
+  hosts: lumiris_prod
+  become: true
+  gather_facts: false
+  vars:
+    image_tag: "{{ image_tag | mandatory }}"
+  tags: [deploy]
+  tasks:
+    - name: Apply app role with image_tag override
+      ansible.builtin.include_role:
+        name: app
+      vars:
+        app_image_tag: "{{ image_tag }}"
+        app_zero_downtime: true

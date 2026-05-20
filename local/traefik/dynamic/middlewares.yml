@@ -1,0 +1,42 @@
+---
+http:
+  middlewares:
+    security-headers:
+      headers:
+        sslRedirect: true
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        referrerPolicy: strict-origin-when-cross-origin
+        customResponseHeaders:
+          X-Frame-Options: DENY
+
+    compress:
+      compress: {}
+
+    # DEV ONLY — never use in prod.
+    cors-allow-all:
+      headers:
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlMaxAge: 3600
+
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - /api
+
+    # YAML requires `$` doubled; regen via `htpasswd -nbB admin admin`.
+    traefik-auth:
+      basicAuth:
+        users:
+          - "admin:$$apr1$$xKkqg$$Y4O4QH/y6IT6sm5GjJBfb0"

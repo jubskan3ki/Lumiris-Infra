@@ -1,0 +1,16 @@
+---
+# Copy to hosts.yml (gitignored) and fill in. ansible.cfg points at this path
+# by default. group_vars/all/vars.yml carries shared values.
+
+all:
+  hosts:
+    lumiris-prod-01:
+      ansible_host: REPLACE_ME              # public IPv4 of the VPS
+      ansible_port: 2222                    # set after common/ssh.yml has moved sshd from :22
+      ansible_user: ansible                 # created by common/users.yml
+      ansible_ssh_private_key_file: ~/.ssh/lumiris_prod_deploy
+
+  children:
+    lumiris_prod:
+      hosts:
+        lumiris-prod-01:

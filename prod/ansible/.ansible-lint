@@ -1,0 +1,11 @@
+---
+# Cross-role shared variables (ssh_port, admin_users, app_dir, vault_*, etc.)
+# are intentionally not role-prefixed — they're meant to be set at inventory
+# group_vars level and read by multiple roles.
+skip_list:
+  - var-naming[no-role-prefix]
+
+# Allow Jinja in task names — the role surfaces useful runtime context
+# (image tag, scale step, service name) in the play output.
+warn_list:
+  - name[template]

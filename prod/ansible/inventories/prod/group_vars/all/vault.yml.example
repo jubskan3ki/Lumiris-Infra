@@ -1,0 +1,22 @@
+---
+# Copy to vault.yml and ENCRYPT WITH SOPS before commit:
+#
+#   sops -e -i vault.yml
+#
+# Then ansible-playbook can read it via:
+#
+#   --extra-vars "@<(sops -d inventories/prod/group_vars/all/vault.yml)"
+#
+# (or wrap that into the Makefile target, see ../../../../Makefile)
+
+vault_infisical_client_id: REPLACE_ME
+vault_infisical_client_secret: REPLACE_ME
+
+vault_ghcr_username: jubs-kan3ki
+vault_ghcr_pat: REPLACE_ME
+
+vault_backup_passphrase: REPLACE_ME
+
+vault_grafana_cloud_token: REPLACE_ME
+
+vault_discord_webhook_url: REPLACE_ME

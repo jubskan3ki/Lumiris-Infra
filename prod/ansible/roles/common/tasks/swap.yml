@@ -1,0 +1,44 @@
+---
+- name: Check if swap file already exists
+  ansible.builtin.stat:
+    path: "{{ common_swap_file }}"
+  register: swap_stat
+
+- name: Allocate swap file with size in MB — {{ common_swap_size_mb }}
+  ansible.builtin.command: "fallocate -l {{ common_swap_size_mb }}M {{ common_swap_file }}"
+  args:
+    creates: "{{ common_swap_file }}"
+  when: not swap_stat.stat.exists
+
+- name: Permission swap file
+  ansible.builtin.file:
+    path: "{{ common_swap_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Run mkswap on the file (idempotent via creates)
+  ansible.builtin.command: "mkswap {{ common_swap_file }}"
+  register: mkswap_result
+  changed_when: "'no label, UUID=' in mkswap_result.stdout or 'Setting up swapspace' in mkswap_result.stdout"
+  failed_when:
+    - mkswap_result.rc != 0
+    - "'Device or resource busy' not in mkswap_result.stderr"
+
+- name: Add swap to /etc/fstab
+  ansible.posix.mount:
+    name: none
+    src: "{{ common_swap_file }}"
+    fstype: swap
+    opts: sw
+    passno: "0"
+    dump: "0"
+    state: present
+
+- name: Enable swap now
+  ansible.builtin.command: "swapon {{ common_swap_file }}"
+  register: swapon_result
+  changed_when: swapon_result.rc == 0
+  failed_when:
+    - swapon_result.rc != 0
+    - "'Device or resource busy' not in swapon_result.stderr"

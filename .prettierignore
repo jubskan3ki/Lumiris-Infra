@@ -1,0 +1,8 @@
+local/postgres/data
+local/redis/data
+local/minio/data
+local/traefik/certs
+local/monitoring/grafana/dashboards
+secrets/*.decrypted
+secrets/*.dec
+bench/out

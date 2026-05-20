@@ -1,0 +1,55 @@
+---
+- name: Lumiris prod — backup
+  hosts: lumiris_prod
+  become: true
+  gather_facts: false
+  tags: [backup]
+  tasks:
+    - name: Ensure backups directory exists
+      ansible.builtin.file:
+        path: "{{ backup_postgres_dump_path }}"
+        state: directory
+        owner: "{{ infisical_runtime_user }}"
+        group: "{{ infisical_runtime_user }}"
+        mode: "0750"
+
+    - name: Run pg_dump via the running api container (uses live SPRING_DATASOURCE_URL)
+      ansible.builtin.command: >
+        docker compose -f {{ app_dir }}/{{ app_compose_file }} exec -T lumiris-api
+        sh -c 'pg_dump "$SPRING_DATASOURCE_URL" | gzip'
+      args:
+        chdir: "{{ app_dir }}"
+      register: dump_result
+      changed_when: dump_result.rc == 0
+      no_log: true
+
+    - name: Persist encrypted dump to disk
+      ansible.builtin.copy:
+        content: "{{ dump_result.stdout }}"
+        dest: "{{ backup_postgres_dump_path }}/lumiris-{{ ansible_date_time.iso8601_basic_short }}.sql.gz"
+        owner: "{{ infisical_runtime_user }}"
+        group: "{{ infisical_runtime_user }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Upload to R2
+      ansible.builtin.command: >
+        rclone copy {{ backup_postgres_dump_path }}/lumiris-{{ ansible_date_time.iso8601_basic_short }}.sql.gz
+        r2:{{ backup_r2_bucket }}/
+      register: rclone_result
+      changed_when: rclone_result.rc == 0
+
+    - name: Prune local dumps older than backup_keep_days — {{ backup_keep_days }}
+      ansible.builtin.find:
+        paths: "{{ backup_postgres_dump_path }}"
+        age: "{{ backup_keep_days }}d"
+        patterns: "lumiris-*.sql.gz"
+      register: stale_dumps
+
+    - name: Remove pruned dumps
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ stale_dumps.files }}"
+      loop_control:
+        label: "{{ item.path }}"

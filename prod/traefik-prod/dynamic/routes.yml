@@ -1,0 +1,16 @@
+---
+http:
+  routers:
+    # Catch-all so unknown Hosts get 404 instead of falling through to a default backend.
+    default-catchall:
+      rule: "HostRegexp(`{any:.+}`)"
+      entryPoints: [websecure]
+      priority: 1
+      service: noop
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    noop:
+      loadBalancer:
+        servers: []

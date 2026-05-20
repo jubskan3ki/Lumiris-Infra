@@ -1,0 +1,166 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  traefik:
+    image: traefik:${TRAEFIK_VERSION:-v3.5}
+    container_name: lumiris-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:${TRAEFIK_METRICS_PORT:-8082}:8082"
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/certs:/etc/traefik/certs:ro
+    networks: [lumiris_local]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`traefik.lumiris.local`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.middlewares=traefik-auth@file
+
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-17-alpine}
+    container_name: lumiris-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lumiris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lumiris_local_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-lumiris}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks: [lumiris_local]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lumiris} -d ${POSTGRES_DB:-lumiris}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+
+  redis:
+    image: redis:${REDIS_VERSION:-7.4-alpine}
+    container_name: lumiris-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+      - --requirepass
+      - ${REDIS_PASSWORD:-lumiris_local_dev_only}
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    networks: [lumiris_local]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-lumiris_local_dev_only}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+
+  minio:
+    image: minio/minio:${MINIO_VERSION:-RELEASE.2024-11-07T00-52-20Z}
+    container_name: lumiris-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lumiris}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lumiris_local_dev_only}
+      MINIO_BROWSER_REDIRECT_URL: https://minio.lumiris.local
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    networks: [lumiris_local]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio-console.rule=Host(`minio.lumiris.local`)
+      - traefik.http.routers.minio-console.entrypoints=websecure
+      - traefik.http.routers.minio-console.tls=true
+      - traefik.http.routers.minio-console.service=minio-console
+      - traefik.http.services.minio-console.loadbalancer.server.port=9001
+      - traefik.http.routers.minio-cdn.rule=Host(`cdn.lumiris.local`)
+      - traefik.http.routers.minio-cdn.entrypoints=websecure
+      - traefik.http.routers.minio-cdn.tls=true
+      - traefik.http.routers.minio-cdn.service=minio-s3
+      - traefik.http.services.minio-s3.loadbalancer.server.port=9000
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: lumiris-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-lumiris}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-lumiris_local_dev_only}
+      MINIO_APP_USER: ${MINIO_APP_USER:-lumiris-app}
+      MINIO_APP_PASSWORD: ${MINIO_APP_PASSWORD:-lumiris_local_dev_only}
+      MINIO_BUCKET_UPLOADS: ${MINIO_BUCKET_UPLOADS:-lumiris-uploads}
+      MINIO_BUCKET_CDN: ${MINIO_BUCKET_CDN:-lumiris-cdn}
+      MINIO_BUCKET_BACKUPS: ${MINIO_BUCKET_BACKUPS:-lumiris-backups}
+    entrypoint: ["/bin/sh", "/init/init-buckets.sh"]
+    volumes:
+      - ./minio/init-buckets.sh:/init/init-buckets.sh:ro
+    networks: [lumiris_local]
+    restart: "no"
+
+  mailhog:
+    image: mailhog/mailhog:${MAILHOG_VERSION:-v1.0.1}
+    container_name: lumiris-mailhog
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILHOG_UI_PORT:-8025}:8025"
+    networks: [lumiris_local]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mailhog.rule=Host(`mailhog.lumiris.local`)
+      - traefik.http.routers.mailhog.entrypoints=websecure
+      - traefik.http.routers.mailhog.tls=true
+      - traefik.http.services.mailhog.loadbalancer.server.port=8025
+
+networks:
+  lumiris_local:
+    name: lumiris_lumiris_local
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: lumiris_postgres_data
+  redis_data:
+    name: lumiris_redis_data
+  minio_data:
+    name: lumiris_minio_data

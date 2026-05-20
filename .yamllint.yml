@@ -1,0 +1,23 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 140
+    level: warning
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+    check-keys: false
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+
+ignore: |
+  local/monitoring/grafana/dashboards/*.json
+  local/postgres/data/
+  local/redis/data/
+  local/minio/data/
+  .git/

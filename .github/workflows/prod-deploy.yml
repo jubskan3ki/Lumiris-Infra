@@ -1,0 +1,99 @@
+---
+# INERT until VPS_DISPONIBLE=true and SOPS_AGE_KEY secret is configured.
+
+name: prod-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (e.g. v0.4.2)"
+        type: string
+        required: true
+      force_recreate:
+        description: "Force recreate containers (cold-restart) instead of rolling"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  VPS_DISPONIBLE: "false"
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Refuse to deploy until VPS is ready
+        run: |
+          if [[ "${VPS_DISPONIBLE}" != "true" ]]; then
+            echo "::error::VPS pas encore disponible. Lis docs/MIGRATION-TO-PROD.md puis active VPS_DISPONIBLE=true dans ce workflow."
+            exit 1
+          fi
+          echo "VPS_DISPONIBLE=true — proceeding."
+
+  deploy:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sops
+        run: |
+          curl -fsSL -o /tmp/sops https://github.com/getsops/sops/releases/download/v3.9.4/sops-v3.9.4.linux.amd64
+          chmod +x /tmp/sops
+          sudo mv /tmp/sops /usr/local/bin/sops
+
+      - name: Materialise age key
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          mkdir -p ~/.config/sops/age
+          printf '%s\n' "$SOPS_AGE_KEY" > ~/.config/sops/age/keys.txt
+          chmod 600 ~/.config/sops/age/keys.txt
+          echo "SOPS_AGE_KEY_FILE=$HOME/.config/sops/age/keys.txt" >> "$GITHUB_ENV"
+
+      - name: Decrypt bootstrap secrets
+        run: |
+          sops --decrypt secrets/prod.env.sops.yaml > /tmp/bootstrap.yml
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import yaml, os
+          data = yaml.safe_load(open('/tmp/bootstrap.yml'))
+          os.makedirs(os.path.expanduser('~/.ssh'), exist_ok=True)
+          key = data['ssh']['deploy_private_key']
+          with open(os.path.expanduser('~/.ssh/id_ed25519'), 'w') as f:
+              f.write(key)
+          os.chmod(os.path.expanduser('~/.ssh/id_ed25519'), 0o600)
+          print(f"VPS_HOST={data['vps']['ip']}")
+          print(f"VPS_PORT={data['vps']['ssh_port']}")
+          print(f"VPS_USER={data['vps']['ansible_user']}")
+          PY
+
+      - name: Install Ansible
+        run: pip install --no-cache-dir 'ansible-core>=2.20,<3.0' 'ansible>=11,<13'
+
+      - name: Materialise inventory
+        run: |
+          sed -e "s/REPLACE_ME/${VPS_HOST}/" \
+              -e "s/ansible_user: ansible/ansible_user: ${VPS_USER}/" \
+              -e "s/ansible_port: 2222/ansible_port: ${VPS_PORT}/" \
+              prod/ansible/inventories/prod/hosts.yml.example \
+              > prod/ansible/inventories/prod/hosts.yml
+
+      - name: ansible-playbook deploy.yml
+        working-directory: prod/ansible
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          ansible-playbook playbooks/deploy.yml \
+            -i inventories/prod/hosts.yml \
+            -e image_tag=${{ inputs.tag }} \
+            -e app_force_recreate=${{ inputs.force_recreate }}

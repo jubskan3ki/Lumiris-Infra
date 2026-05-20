@@ -1,0 +1,12 @@
+---
+# Regenerate certs with `make setup-certs` (mkcert wrapper).
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/lumiris.local.crt
+      keyFile: /etc/traefik/certs/lumiris.local.key
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/lumiris.local.crt
+        keyFile: /etc/traefik/certs/lumiris.local.key

@@ -1,0 +1,79 @@
+# Optional overlay to containerise Next.js apps; default `make all-up` runs bun dev on host for HMR.
+
+x-bun-defaults: &bun-defaults
+  image: oven/bun:1.1.38-alpine
+  working_dir: /repo
+  environment:
+    NODE_ENV: development
+    WATCHPACK_POLLING: 'true'
+    CHOKIDAR_USEPOLLING: 'true'
+  networks: [lumiris_local]
+  extra_hosts:
+    - 'host.docker.internal:host-gateway'
+  healthcheck:
+    disable: true
+
+services:
+  admin:
+    <<: *bun-defaults
+    container_name: lumiris-admin-dev
+    command: ['bun', 'run', 'dev:admin']
+    ports: ['127.0.0.1:3001:3001']
+    volumes:
+      - ../../Lumiris-Front:/repo
+      - /repo/node_modules
+      - /repo/apps/admin/.next
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.admin-dev.rule=Host(`admin.lumiris.local`)
+      - traefik.http.routers.admin-dev.entrypoints=websecure
+      - traefik.http.routers.admin-dev.tls=true
+      - traefik.http.services.admin-dev.loadbalancer.server.port=3001
+
+  site:
+    <<: *bun-defaults
+    container_name: lumiris-site-dev
+    command: ['bun', 'run', 'dev:site']
+    ports: ['127.0.0.1:3000:3000']
+    volumes:
+      - ../../Lumiris-Front:/repo
+      - /repo/node_modules
+      - /repo/apps/site/.next
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.site-dev.rule=Host(`lumiris.local`)
+      - traefik.http.routers.site-dev.entrypoints=websecure
+      - traefik.http.routers.site-dev.tls=true
+      - traefik.http.services.site-dev.loadbalancer.server.port=3000
+
+  mobile:
+    <<: *bun-defaults
+    container_name: lumiris-mobile-dev
+    command: ['bun', 'run', 'dev:mobile']
+    ports: ['127.0.0.1:3002:3002']
+    volumes:
+      - ../../Lumiris-Front:/repo
+      - /repo/node_modules
+      - /repo/apps/mobile/.next
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mobile-dev.rule=Host(`mobile.lumiris.local`)
+      - traefik.http.routers.mobile-dev.entrypoints=websecure
+      - traefik.http.routers.mobile-dev.tls=true
+      - traefik.http.services.mobile-dev.loadbalancer.server.port=3002
+
+  client:
+    <<: *bun-defaults
+    container_name: lumiris-client-dev
+    command: ['bun', 'run', 'dev:client']
+    ports: ['127.0.0.1:3003:3003']
+    volumes:
+      - ../../Lumiris-Front:/repo
+      - /repo/node_modules
+      - /repo/apps/client/.next
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.client-dev.rule=Host(`client.lumiris.local`)
+      - traefik.http.routers.client-dev.entrypoints=websecure
+      - traefik.http.routers.client-dev.tls=true
+      - traefik.http.services.client-dev.loadbalancer.server.port=3003

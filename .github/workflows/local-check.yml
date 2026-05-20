@@ -1,0 +1,89 @@
+---
+name: local-check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint (yaml + shell + dockerfile + secrets + format)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install --no-cache-dir yamllint==1.35.1
+
+      - name: yamllint
+        run: yamllint -c .yamllint.yml .
+
+      - uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: scripts
+          additional_files: seed/apply-seed.sh
+          severity: warning
+
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          ignore: DL3008,DL3015
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: prettier --check
+        run: npx --yes prettier@3 --check '**/*.{md,yml,yaml,json}' --ignore-path .prettierignore
+
+  terraform-validate:
+    name: terraform fmt + validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.0"
+          terraform_wrapper: false
+
+      - name: terraform fmt -check -recursive
+        run: terraform fmt -check -recursive prod/terraform/
+
+      - name: terraform init -backend=false
+        working-directory: prod/terraform
+        run: terraform init -backend=false -input=false -no-color
+
+      - name: terraform validate
+        working-directory: prod/terraform
+        run: terraform validate -no-color
+
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ansible/ansible-lint@v24.12.2
+        with:
+          working_directory: prod/ansible

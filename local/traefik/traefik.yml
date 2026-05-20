@@ -1,0 +1,53 @@
+---
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http3: {}
+  dashboard:
+    address: ":8080"
+  metrics:
+    address: ":8082"
+
+providers:
+  # Docker provider disabled: Docker 29 requires API >=1.40 but Traefik v3 SDK only announces 1.24.
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+api:
+  dashboard: true
+  insecure: false
+
+log:
+  level: INFO
+  format: common
+
+accessLog:
+  format: common
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
+
+ping:
+  entryPoint: dashboard

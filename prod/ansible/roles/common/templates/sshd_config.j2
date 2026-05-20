@@ -1,0 +1,32 @@
+{# Managed by Ansible — do not edit by hand. #}
+Port {{ ssh_port }}
+AddressFamily any
+ListenAddress 0.0.0.0
+ListenAddress ::
+
+Protocol 2
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+PermitRootLogin {{ ssh_permit_root_login }}
+PubkeyAuthentication yes
+PasswordAuthentication {{ 'yes' if ssh_password_authentication else 'no' }}
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+KbdInteractiveAuthentication no
+
+MaxAuthTries {{ ssh_max_auth_tries }}
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+AllowUsers {{ ssh_allowed_users | join(' ') }}
+
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+
+Subsystem sftp /usr/lib/openssh/sftp-server

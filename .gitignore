@@ -1,0 +1,55 @@
+# Environment files (secrets) — keep only .example
+.env
+.env.*
+!.env.example
+
+# Terraform / state
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+prod/terraform/envs/prod/backend.config
+
+# Ansible runtime
+prod/ansible/.ansible-cache/
+prod/ansible/inventories/prod/hosts.yml
+!prod/ansible/inventories/prod/hosts.yml.example
+
+# NOTE: sops-encrypted files (`secrets/*.sops.yaml`, `group_vars/all/vault.yml`)
+# are COMMITTED in their encrypted form. Don't gitignore them by extension.
+# Cleartext leaks are caught by gitleaks (local-check.yml) + the magic-byte
+# check in scripts/prod-bootstrap.sh.
+
+# Local data volumes (persisted by docker)
+/local/postgres/data/*
+!/local/postgres/data/.gitkeep
+/local/redis/data/*
+!/local/redis/data/.gitkeep
+/local/minio/data/*
+!/local/minio/data/.gitkeep
+/local/traefik/certs/*
+!/local/traefik/certs/.gitkeep
+
+# Decrypted secrets
+*.decrypted
+*.dec
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*~
+.vscode/
+.idea/
+
+# tmp / pids / logs
+/tmp/
+/pids/
+*.log
+
+# tmux session files
+.tmux-lumiris.sock
+
+docs/
+context/

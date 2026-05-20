@@ -1,0 +1,5 @@
+---
+monitoring_config_dir: /etc/lumiris-monitoring
+monitoring_owner: root
+monitoring_group: root
+vault_grafana_cloud_token: ""

@@ -1,0 +1,121 @@
+---
+# Backend + Next.js apps run on the host; Traefik reaches them via host.docker.internal.
+
+http:
+  routers:
+    api:
+      rule: "Host(`api.lumiris.local`)"
+      entryPoints: [websecure]
+      service: api
+      tls: {}
+      middlewares:
+        - compress@file
+        - security-headers@file
+
+    site:
+      rule: "Host(`lumiris.local`)"
+      entryPoints: [websecure]
+      service: site
+      tls: {}
+      middlewares:
+        - compress@file
+        - security-headers@file
+
+    admin:
+      rule: "Host(`admin.lumiris.local`)"
+      entryPoints: [websecure]
+      service: admin
+      tls: {}
+      middlewares:
+        - compress@file
+        - security-headers@file
+
+    mobile:
+      rule: "Host(`mobile.lumiris.local`)"
+      entryPoints: [websecure]
+      service: mobile
+      tls: {}
+      middlewares:
+        - compress@file
+        - security-headers@file
+
+    client:
+      rule: "Host(`client.lumiris.local`)"
+      entryPoints: [websecure]
+      service: client
+      tls: {}
+      middlewares:
+        - compress@file
+        - security-headers@file
+
+    traefik-dashboard:
+      rule: "Host(`traefik.lumiris.local`)"
+      entryPoints: [websecure]
+      service: api@internal
+      tls: {}
+      middlewares:
+        - traefik-auth@file
+
+    mailhog:
+      rule: "Host(`mailhog.lumiris.local`)"
+      entryPoints: [websecure]
+      service: mailhog
+      tls: {}
+
+    minio-console:
+      rule: "Host(`minio.lumiris.local`)"
+      entryPoints: [websecure]
+      service: minio-console
+      tls: {}
+
+    minio-cdn:
+      rule: "Host(`cdn.lumiris.local`)"
+      entryPoints: [websecure]
+      service: minio-cdn
+      tls: {}
+
+  services:
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8080"
+        passHostHeader: true
+
+    site:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3000"
+        passHostHeader: true
+
+    admin:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3001"
+        passHostHeader: true
+
+    mobile:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3002"
+        passHostHeader: true
+
+    client:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3003"
+        passHostHeader: true
+
+    mailhog:
+      loadBalancer:
+        servers:
+          - url: "http://mailhog:8025"
+
+    minio-console:
+      loadBalancer:
+        servers:
+          - url: "http://minio:9001"
+
+    minio-cdn:
+      loadBalancer:
+        servers:
+          - url: "http://minio:9000"

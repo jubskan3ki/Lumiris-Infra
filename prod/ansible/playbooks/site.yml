@@ -1,0 +1,13 @@
+---
+- name: Lumiris prod — full converge
+  hosts: lumiris_prod
+  become: true
+  gather_facts: true
+  tags: [site]
+  roles:
+    - {role: common, tags: [common]}
+    - {role: docker, tags: [docker]}
+    - {role: infisical, tags: [infisical]}
+    - {role: traefik, tags: [traefik]}
+    - {role: monitoring, tags: [monitoring]}
+    - {role: app, tags: [app]}

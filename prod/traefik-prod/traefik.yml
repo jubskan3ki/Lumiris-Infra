@@ -1,0 +1,75 @@
+---
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - security-headers@file
+        - compress@file
+    http3: {}
+  metrics:
+    # Internal only — bound to 127.0.0.1 by the compose port mapping.
+    address: ":8082"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: lumiris_prod
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+api:
+  dashboard: false
+  insecure: false
+
+ping:
+  entryPoint: metrics
+
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  filters:
+    statusCodes:
+      - "400-599"
+    retryAttempts: true
+    minDuration: "10ms"
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: ops@lumiris.eu
+      storage: /etc/traefik/acme/acme.json
+      httpChallenge:
+        entryPoint: web
