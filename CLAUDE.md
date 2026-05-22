@@ -17,25 +17,30 @@
 Lumiris-Infra/
 ├── local/             # Docker compose dev (base + monitoring + tools overlays)
 ├── prod/              # Terraform + Ansible + compose.prod (inert until VPS bootstrapped)
-├── scripts/           # _lib.sh + all-{up,down,status,…}.sh + check-prereqs.sh + secrets-*.sh
+├── scripts/           # _lib.sh + setup-{hosts,certs}.sh + smoke-test + secrets-*.sh + seed
 ├── seed/              # apply-seed.sh + fixtures
 ├── secrets/           # *.sops.yaml (chiffrés via age)
 ├── bench/             # k6 scenarios
+├── .mise.toml         # toolchain dev (bun, java, jq, mkcert, age, sops, mprocs, tmux)
+├── mprocs.yaml        # orchestration TUI infra + backend + front
 └── docs/              # ARCHITECTURE / LOCAL / SERVICES / MIGRATION-TO-PROD / …
 ```
 
 ## Commandes essentielles
 
 ```bash
-make check         # vérifie docker/compose/bun/mkcert/jq/tmux/age/sops
+make tools         # mise install (bun/java/jq/mkcert/age/sops/mprocs/tmux selon .mise.toml)
 make setup         # hosts + certs + .env (idempotent)
-make all-up        # tmux 4 windows : infra docker + backend mvn + front bun + status
-make all-down      # arrête tmux + docker compose down (volumes conservés)
-make all-status    # tmux + containers + healthchecks + table d'URLs
+make dev           # mprocs : infra docker + backend mvn + front bun dans un TUI unique
 make smoke-test    # curl healthchecks des URLs principales
 make reset         # docker compose down -v (CONFIRMATION requise, perte des volumes)
 make help          # tous les targets groupés
 ```
+
+Pas de scripts d'orchestration maison (`all-up/down/status`) ni de check de
+pré-requis : remplacés par `mise` (`.mise.toml`) + `mprocs` (`mprocs.yaml`).
+Hotkeys mprocs : `r` restart focus · `x` kill · `s` start · `q` quit (envoie
+SIGTERM à tous les process, arrête proprement les containers).
 
 Profils additionnels : `make up-monitoring` (Grafana/Prom/Tempo/Loki/OTel),
 `make up-tools` (pgAdmin/Redis Commander), `make up-full` (les deux).

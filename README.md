@@ -4,7 +4,8 @@
 
 Ce dépôt centralise tout ce qui permet de faire tourner localement (et bientôt en
 production) la stack Lumiris : Docker compose, configuration Traefik, certificats
-mkcert, scripts d'amorçage, monitoring, et orchestration tmux des autres repos.
+mkcert, scripts d'amorçage, monitoring, et orchestration des autres repos via
+[mprocs](https://github.com/pvolok/mprocs).
 
 ## Layout
 
@@ -14,29 +15,33 @@ mkcert, scripts d'amorçage, monitoring, et orchestration tmux des autres repos.
 ├── Lumiris-Backend/    API Spring Boot 3.4.5 / Java 21 (port 8080)
 └── Lumiris-Infra/      Orchestration locale + prep prod (ce repo)
     ├── local/          Docker compose dev (Traefik, Postgres, Redis, MinIO, Mailhog, monitoring)
-    ├── prod/     Stack containerisee pour deploiement futur (inerte)
-    ├── scripts/        check-prereqs.sh, setup-hosts.sh, setup-certs.sh
+    ├── prod/           Stack containerisee pour deploiement futur (inerte)
+    ├── scripts/        setup-hosts.sh, setup-certs.sh, smoke-test, secrets, seed
     ├── seed/           Jeux de donnees de seed
     ├── secrets/        SOPS + age (config initiale)
     ├── bench/          Outils de benchmark
+    ├── .mise.toml      Toolchain dev (bun, java, jq, mkcert, age, sops, mprocs)
+    ├── mprocs.yaml     Orchestration TUI infra + backend + front
     └── docs/           Documentation (ce dossier)
 ```
 
 ## Quickstart
 
-### 1. Prerequisites
+### 1. Pré-requis système (à installer une fois)
 
 - Docker Engine + Docker Compose v2
-- `bun` >= 1.1.38
-- Java 21 + Maven Wrapper (fourni dans Lumiris-Backend)
-- `make`, `mkcert`, `jq`, `tmux`
-- `age`, `sops` (pour la gestion secrets future)
+- `make`
+- [`mise`](https://mise.jdx.dev) (`curl https://mise.run | sh`)
 
-### 2. Verifier l'environnement
+Tout le reste (bun, java 21, jq, mkcert, age, sops, mprocs, tmux) est géré par
+`mise` via [`.mise.toml`](.mise.toml).
+
+### 2. Installer la toolchain
 
 ```bash
 cd ~/Dev/Lumiris/Lumiris-Infra
-./scripts/check-prereqs.sh
+make tools                       # = mise install ; mise ls
+mise activate zsh >> ~/.zshrc    # (une seule fois) auto-PATH dans les nouveaux shells
 ```
 
 ### 3. Setup initial (une seule fois)
@@ -51,32 +56,26 @@ Ce target enchaine :
 - `setup-certs.sh` — genere les certificats locaux via `mkcert`
 - Initialisation des fichiers `.env` a partir des `.env.example`
 
-### 4. Demarrer la stack complete
+### 4. Démarrer la stack complète
 
 ```bash
-make all-up
+make dev
 ```
 
-Cree une session `tmux` nommee `lumiris` avec 4 fenetres :
+Lance [mprocs](https://github.com/pvolok/mprocs) avec 3 process (cf. [`mprocs.yaml`](mprocs.yaml)) :
 
-| Window    | Role                                                               |
-| --------- | ------------------------------------------------------------------ |
-| `infra`   | `docker compose up` (Traefik + Postgres + Redis + MinIO + Mailhog) |
-| `backend` | `./mvnw spring-boot:run` dans Lumiris-Backend                      |
-| `front`   | `bun run dev` (Turbo orchestre les 4 apps) dans Lumiris-Front      |
-| `status`  | Boucle d'affichage `make all-status`                               |
+| Process   | Rôle                                                                 |
+| --------- | -------------------------------------------------------------------- |
+| `infra`   | `docker compose up` (Traefik + Postgres + Redis + MinIO + Mailhog)   |
+| `backend` | `./mvnw spring-boot:run` dans Lumiris-Backend                        |
+| `front`   | `bun dev` (Turbo orchestre les 4 apps) dans Lumiris-Front            |
 
-### 5. S'attacher pour suivre les logs
+Hotkeys mprocs : `↑↓` naviguer · `<Tab>` logs↔liste · `r` restart focus ·
+`x` kill focus · `s` start arrêté · `q` quit (envoie SIGTERM à tous les process,
+les containers s'arrêtent proprement).
 
-```bash
-tmux attach -t lumiris
-```
-
-Detach via `Ctrl-b d`. Vue d'ensemble rapide sans attacher :
-
-```bash
-make all-status
-```
+> Pas d'auto-restart sur modif fichier : volontaire. Tu redémarres un process
+> à la main avec `r` quand tu en as besoin.
 
 ## Stack locale
 

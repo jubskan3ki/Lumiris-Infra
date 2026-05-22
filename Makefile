@@ -20,7 +20,6 @@ CF_TOOLS      := -f $(LOCAL_DIR)/docker-compose.yml -f $(LOCAL_DIR)/docker-compo
 CF_FULL       := -f $(LOCAL_DIR)/docker-compose.yml -f $(LOCAL_DIR)/docker-compose.monitoring.yml -f $(LOCAL_DIR)/docker-compose.tools.yml
 
 DC          := docker compose --project-directory $(LOCAL_DIR)
-TMUX_NAME   := lumiris
 
 ##@ Help
 .PHONY: help
@@ -32,9 +31,11 @@ help: ## Liste les targets groupés par section
 	@printf '\n\033[1;33mInfo\033[0m  project=%s  root=%s\n' "$(COMPOSE_PROJECT_NAME)" "$(ROOT)"
 
 ##@ Bootstrap
-.PHONY: check setup
-check: ## Vérifie les prérequis (docker, compose, bun, mkcert, jq, tmux, age, sops)
-	@$(SCRIPTS_DIR)/check-prereqs.sh
+.PHONY: tools setup
+tools: ## Installe la toolchain dev via mise (lit .mise.toml)
+	@command -v mise >/dev/null 2>&1 || { echo "[tools] mise absent — install: curl https://mise.run | sh"; exit 1; }
+	@mise install
+	@mise ls
 
 setup: ## Hosts + certs + .env (idempotent)
 	@$(SCRIPTS_DIR)/setup-hosts.sh
@@ -47,21 +48,11 @@ setup: ## Hosts + certs + .env (idempotent)
 	fi
 	@echo "[setup] OK"
 
-##@ Stack locale (Phase 1)
-.PHONY: all-up all-down all-status all-restart all-attach
-all-up: ## Démarre tout (infra docker + backend mvn + front bun) via tmux
-	@$(SCRIPTS_DIR)/all-up.sh
-
-all-down: ## Arrête tout proprement (tmux + docker compose down)
-	@$(SCRIPTS_DIR)/all-down.sh
-
-all-status: ## État complet (tmux + containers + healthchecks + URLs)
-	@$(SCRIPTS_DIR)/all-status.sh
-
-all-restart: all-down all-up ## Redémarre toute la stack
-
-all-attach: ## Attache au tmux 'lumiris'
-	@tmux attach -t $(TMUX_NAME) || { echo "[attach] session '$(TMUX_NAME)' absente — lance 'make all-up'"; exit 1; }
+##@ Stack locale (dev)
+.PHONY: dev
+dev: ## Lance infra + backend + front dans un TUI mprocs (q = quit, r = restart focused)
+	@command -v mise >/dev/null 2>&1 || { echo "[dev] mise absent — install: curl https://mise.run | sh"; exit 1; }
+	@mise exec -- mprocs -c mprocs.yaml
 
 .PHONY: up down restart ps logs
 up: ## docker compose up -d (infra seule, sans tmux ni apps)

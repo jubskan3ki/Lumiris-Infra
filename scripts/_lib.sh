@@ -35,10 +35,9 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$LIB_DIR/.." && pwd)"
 LOCAL_DIR="$ROOT/local"
 SCRIPTS_DIR="$ROOT/scripts"
-SESSION="lumiris"
-export ROOT LOCAL_DIR SCRIPTS_DIR SESSION
+export ROOT LOCAL_DIR SCRIPTS_DIR
 
-# Format: "label|host|description"
+# Format: "label|host|description". Source de vérité pour setup-hosts.sh.
 SERVICES=(
   "Site      |lumiris.local         |Vitrine (host:3000)"
   "Admin     |admin.lumiris.local   |Admin (host:3001)"
@@ -66,77 +65,8 @@ service_field() {
   esac
 }
 
-print_urls_table() {
-  printf '\n%sURLs locales%s\n' "$YELLOW" "$NC"
-  local entry label host desc
-  for entry in "${SERVICES[@]}"; do
-    label="$(service_field "$entry" 1)"
-    host="$(service_field "$entry" 2)"
-    desc="$(service_field "$entry" 3)"
-    printf "  %-12s https://%-26s %s\n" "$label" "$host" "$desc"
-  done
-}
-
-# Prints: healthy|starting|unhealthy|no-health|absent.
-container_health() {
-  local name="$1" cid status
-  cid="$(docker ps --filter "name=$name" --format '{{.ID}}' 2>/dev/null | head -n1)"
-  if [[ -z "$cid" ]]; then
-    printf 'absent'
-    return
-  fi
-  status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-health{{end}}' "$cid" 2>/dev/null || echo unknown)"
-  printf '%s' "$status"
-}
-
-print_container_health() {
-  local name="$1" status color
-  status="$(container_health "$name")"
-  case "$status" in
-    healthy)             color="$GREEN" ;;
-    starting|no-health)  color="$YELLOW" ;;
-    *)                   color="$RED" ;;
-  esac
-  printf "  %-12s %s%s%s\n" "$name" "$color" "$status" "$NC"
-}
-
-# Args: container_name [timeout_seconds=60]
-wait_for_healthy() {
-  local name="$1" timeout="${2:-60}"
-  local deadline=$(( SECONDS + timeout ))
-  local status
-  while (( SECONDS < deadline )); do
-    status="$(container_health "$name")"
-    case "$status" in
-      healthy)
-        ok "$name : healthy"
-        return 0
-        ;;
-      no-health)
-        if docker inspect --format='{{.State.Running}}' \
-             "$(docker ps --filter "name=$name" --format '{{.ID}}' | head -n1)" 2>/dev/null | grep -q true; then
-          warn "$name : pas de healthcheck mais running"
-          return 0
-        fi
-        ;;
-    esac
-    printf '  %s : %s ...\r' "$name" "$status"
-    sleep 2
-  done
-  echo
-  warn "$name : timeout ${timeout}s atteint (la stack continue de démarrer)."
-  return 1
-}
-
 # Args: url [timeout=2]; prints status code or "DOWN".
 http_status() {
   local url="$1" timeout="${2:-2}"
   curl -k -s -o /dev/null -w '%{http_code}' --max-time "$timeout" "$url" 2>/dev/null || echo DOWN
-}
-
-http_reachable() {
-  case "$1" in
-    2*|3*|401|403) return 0 ;;
-    *)             return 1 ;;
-  esac
 }

@@ -1,0 +1,12 @@
+procs:
+  infra:
+    cwd: local
+    shell: docker compose up
+
+  backend:
+    cwd: ../Lumiris-Backend
+    shell: "if [ -f .env ]; then set -a; . ./.env; set +a; fi; exec ./mvnw spring-boot:run"
+
+  front:
+    cwd: ../Lumiris-Front
+    shell: bun dev
